@@ -644,6 +644,30 @@ static struct table_reg *rtldsa_930x_lag_table(void)
 	return rtl_table_get(RTL9300_TBL_0, 7);
 }
 
+static int rtldsa_930x_stp_access(struct rtl838x_switch_priv *priv,
+				  u16 msti, int port, u32 *new_state)
+{
+	u32 cmd = BIT(17) | (4 << 12) | (msti & 0xfff); /* read table 4 */
+	int idx = 1 - ((port + 3) / 16);
+	int bit = 2 * ((port + 3) % 16);
+	u32 old_state, state;
+
+	priv->r->exec_tbl0_cmd(cmd);
+	state = sw_r32(priv->r->tbl_access_data_0(idx));
+
+	old_state = (state >> bit) & 3;
+
+	if (new_state) {
+		state = (state & ~(3 << bit)) | ((*new_state & 3) << bit);
+		sw_w32(state, priv->r->tbl_access_data_0(idx));
+
+		cmd ^= BIT(16); /* write table 4 */
+		priv->r->exec_tbl0_cmd(cmd);
+	}
+
+	return old_state;
+}
+
 static int rtldsa_930x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, int port, u32 port_state[])
 {
 	int idx = 1 - ((port + 3) / 16);
@@ -2844,6 +2868,7 @@ const struct rtldsa_config rtldsa_930x_cfg = {
 	.vlan_fwd_on_inner = rtl930x_vlan_fwd_on_inner,
 	.set_vlan_igr_filter = rtl930x_set_igr_filter,
 	.set_vlan_egr_filter = rtl930x_set_egr_filter,
+	.stp_access = rtldsa_930x_stp_access,
 	.stp_get = rtldsa_930x_stp_get,
 	.stp_set = rtl930x_stp_set,
 	.mac_link_sts = RTL930X_MAC_LINK_STS,

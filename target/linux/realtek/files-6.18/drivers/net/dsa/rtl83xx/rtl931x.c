@@ -267,6 +267,30 @@ rtldsa_931x_vlan_profile_dump(struct rtl838x_switch_priv *priv, int idx)
 		p.unkn_mc_fld.pmsks.ip, p.unkn_mc_fld.pmsks.ip6);
 }
 
+static int rtldsa_931x_stp_access(struct rtl838x_switch_priv *priv,
+				  u16 msti, int port, u32 *new_state)
+{
+	u32 cmd = BIT(20) | (5 << 12) | (msti & 0xfff); /* read table 5 */
+	int idx = 3 - ((port + 8) / 16);
+	int bit = 2 * ((port + 8) % 16);
+	u32 old_state, state;
+
+	priv->r->exec_tbl0_cmd(cmd);
+	state = sw_r32(priv->r->tbl_access_data_0(idx));
+
+	old_state = (state >> bit) & 3;
+
+	if (new_state) {
+		state = (state & ~(3 << bit)) | ((*new_state & 3) << bit);
+		sw_w32(state, priv->r->tbl_access_data_0(idx));
+
+		cmd ^= BIT(19); /* write table 5 */
+		priv->r->exec_tbl0_cmd(cmd);
+	}
+
+	return old_state;
+}
+
 static int rtldsa_931x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, int port, u32 port_state[])
 {
 	int idx = 3 - ((port + 8) / 16);
@@ -1982,6 +2006,7 @@ const struct rtldsa_config rtldsa_931x_cfg = {
 	.vlan_profile_dump = rtldsa_931x_vlan_profile_dump,
 	.vlan_profile_setup = rtl931x_vlan_profile_setup,
 	.vlan_fwd_on_inner = rtl931x_vlan_fwd_on_inner,
+	.stp_access = rtldsa_931x_stp_access,
 	.stp_get = rtldsa_931x_stp_get,
 	.stp_set = rtl931x_stp_set,
 	.mac_force_mode_ctrl = rtl931x_mac_force_mode_ctrl,
