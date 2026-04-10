@@ -682,34 +682,6 @@ static int rtldsa_838x_stp_access(struct rtl838x_switch_priv *priv,
 	return old_state;
 }
 
-static int rtldsa_838x_stp_get(struct rtl838x_switch_priv *priv, u16 msti, int port, u32 port_state[])
-{
-	int idx = 1 - (port / 16);
-	int bit = 2 * (port % 16);
-	u32 cmd = 1 << 15 | /* Execute cmd */
-		  1 << 14 | /* Read */
-		  2 << 12 | /* Table type 0b10 */
-		  (msti & 0xfff);
-
-	priv->r->exec_tbl0_cmd(cmd);
-	for (int i = 0; i < 2; i++)
-		port_state[i] = sw_r32(priv->r->tbl_access_data_0(i));
-
-	return (port_state[idx] >> bit) & 3;
-}
-
-static void rtl838x_stp_set(struct rtl838x_switch_priv *priv, u16 msti, u32 port_state[])
-{
-	u32 cmd = 1 << 15 | /* Execute cmd */
-		  0 << 14 | /* Write */
-		  2 << 12 | /* Table type 0b10 */
-		  (msti & 0xfff);
-
-	for (int i = 0; i < 2; i++)
-		sw_w32(port_state[i], priv->r->tbl_access_data_0(i));
-	priv->r->exec_tbl0_cmd(cmd);
-}
-
 static void rtl838x_traffic_set(int source, u64 dest_matrix)
 {
 	rtl838x_set_port_reg(dest_matrix, rtl838x_port_iso_ctrl(source));
@@ -1890,8 +1862,6 @@ const struct rtldsa_config rtldsa_838x_cfg = {
 	.enable_bcast_flood = rtl838x_enable_bcast_flood,
 	.set_static_move_action = rtl838x_set_static_move_action,
 	.stp_access = rtldsa_838x_stp_access,
-	.stp_get = rtldsa_838x_stp_get,
-	.stp_set = rtl838x_stp_set,
 	.mac_port_ctrl = rtl838x_mac_port_ctrl,
 	.l2_port_new_salrn = rtl838x_l2_port_new_salrn,
 	.l2_port_new_sa_fwd = rtl838x_l2_port_new_sa_fwd,
